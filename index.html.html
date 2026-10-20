@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Validador de Comissão</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: barra de configuração à esquerda (canal, perfil, arquivos, mês); resultados à direita, do resumo ao detalhe. */
+:root{
+  --bg:#f6f4f3; --surface:#ffffff; --sunk:#efeceb; --line:#e0dbd9; --fg:#1d1a19; --muted:#6b6361;
+  --accent:#e3000f; --accent-ink:#ffffff; --accent-soft:#fde6e7;
+  --ok:#1d7a46; --ok-soft:#e1f2e8; --warn:#9a5b00; --warn-soft:#fbf0d9; --bad:#b0000b; --bad-soft:#fde3e4;
+  --f-display:"Archivo","Arial Narrow",system-ui,sans-serif; --f-body:"Public Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#151312; --surface:#1e1b1a; --sunk:#262221; --line:#38322f; --fg:#f1edeb; --muted:#a69d99;
+  --accent:#ff3b45; --accent-ink:#1a0002; --accent-soft:#3a1517;
+  --ok:#5cc98b; --ok-soft:#173a26; --warn:#f0b75a; --warn-soft:#3a2c12; --bad:#ff7a80; --bad-soft:#401a1c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#151312; --surface:#1e1b1a; --sunk:#262221; --line:#38322f; --fg:#f1edeb; --muted:#a69d99;
+  --accent:#ff3b45; --accent-ink:#1a0002; --accent-soft:#3a1517;
+  --ok:#5cc98b; --ok-soft:#173a26; --warn:#f0b75a; --warn-soft:#3a2c12; --bad:#ff7a80; --bad-soft:#401a1c; color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 var(--f-body);padding-inline:16px;padding-block:0 48px}
+h1,h2,h3{font-family:var(--f-display);text-wrap:balance;margin:0;letter-spacing:-.01em}
+.wrap{max-width:1320px;margin:0 auto}
+header.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-block:22px 18px;border-bottom:3px solid var(--accent)}
+.brand{display:flex;flex-direction:column;gap:2px}
+.brand .eyebrow{font:600 11px/1 var(--f-body);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.brand h1{font-size:30px;font-weight:800}
+.brand p{margin:0;color:var(--muted);font-size:13.5px;max-width:62ch}
+.privacy{font-size:12.5px;color:var(--muted);display:flex;gap:8px;align-items:center;max-width:44ch}
+.privacy b{color:var(--fg);font-weight:600}
+.lock{width:9px;height:9px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 0 3px var(--ok-soft)}
+.grid{display:grid;grid-template-columns:330px minmax(0,1fr);gap:24px;margin-top:22px;align-items:start}
+@media (max-width:960px){.grid{grid-template-columns:minmax(0,1fr)}}
+aside{display:flex;flex-direction:column;gap:14px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 12px)}
+@media (max-width:960px){aside{position:static}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.step{display:flex;align-items:baseline;gap:8px}
+.step .n{font:700 12px/1 var(--f-mono);color:var(--accent)}
+.step h2{font-size:15px;font-weight:700;text-transform:uppercase;letter-spacing:.06em}
+label.fl{font-size:12px;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;letter-spacing:.02em}
+select,input[type=number],input[type=text]{width:100%;font:inherit;font-size:14px;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+select:focus-visible,input:focus-visible,button:focus-visible,.drop:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chan{font:600 12.5px/1 var(--f-body);padding:8px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.chan[aria-pressed=true]{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.chan.off{color:var(--muted)}
+.chan.off::after{content:" · em breve";font-weight:400}
+.note{font-size:12.5px;color:var(--muted);margin:0}
+.weights{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.weights div{background:var(--sunk);border-radius:6px;padding:6px 8px;font-size:11.5px;color:var(--muted);line-height:1.25}
+.weights b{display:block;font:600 14px/1.2 var(--f-mono);color:var(--fg)}
+.drop{border:1.5px dashed var(--line);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;background:var(--sunk);font-size:13.5px}
+.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop b{color:var(--accent)}
+.files{display:flex;flex-direction:column;gap:6px}
+.file{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:8px;align-items:center;font-size:12.5px;padding:7px 8px;border:1px solid var(--line);border-radius:8px}
+.file .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file .sub{color:var(--muted);font-size:11.5px}
+.tag{font:600 10.5px/1 var(--f-body);letter-spacing:.06em;text-transform:uppercase;padding:4px 6px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.tag.parceiro{background:var(--accent-soft);color:var(--accent)}
+.tag.analitico{background:var(--ok-soft);color:var(--ok)}
+.tag.meta{background:var(--warn-soft);color:var(--warn)}
+.x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:2px 4px}
+.btn{font:600 13px/1 var(--f-body);border-radius:8px;padding:9px 12px;border:1px solid var(--line);background:var(--surface);color:var(--fg);cursor:pointer}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.check{display:flex;gap:8px;align-items:flex-start;font-size:13px}
+.check input{margin-top:3px;accent-color:var(--accent)}
+main{display:flex;flex-direction:column;gap:20px;min-width:0}
+.banner{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;background:var(--warn-soft);color:var(--warn);border-radius:var(--r);padding:10px 14px;font-size:13px}
+.banner b{font-weight:700}
+.headline{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 16px}
+.headline h2{font-size:24px;font-weight:700}
+.headline .ctx{color:var(--muted);font-size:13px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:760px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.kpi .l{font-size:12px;color:var(--muted);font-weight:600}
+.kpi .v{font:700 28px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
+.kpi .s{font-size:12px;color:var(--muted)}
+.kpi.hot{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.kpi.hot .v{color:var(--accent)}
+section.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+section.card>header{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:baseline;justify-content:space-between}
+section.card h3{font-size:18px;font-weight:700}
+.tw{overflow-x:auto;min-width:0}
+table{border-collapse:collapse;width:100%;font-size:13px;font-variant-numeric:tabular-nums}
+th{font:600 11px/1.2 var(--f-body);text-transform:uppercase;letter-spacing:.06em;color:var(--muted);text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+td.n,th.n{text-align:right}
+td.wide{min-width:170px}
+td.mono{font-family:var(--f-mono);font-size:12.5px;white-space:nowrap}
+tr.tot td{font-weight:700;border-bottom:0}
+.pill{display:inline-block;font:600 11px/1 var(--f-body);padding:5px 8px;border-radius:999px;white-space:nowrap}
+.pill.contestar{background:var(--bad-soft);color:var(--bad)}
+.pill.conferir{background:var(--warn-soft);color:var(--warn)}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.no{background:var(--sunk);color:var(--muted)}
+.gap{color:var(--accent);font-weight:700}
+.muted{color:var(--muted)}
+.sim td input{width:70px;padding:5px 7px;text-align:right;font-family:var(--f-mono);font-size:12.5px}
+.bar{height:6px;background:var(--sunk);border-radius:3px;position:relative;min-width:80px;overflow:hidden}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--muted);border-radius:3px}
+.bar i.after{background:var(--accent);opacity:.85}
+.verdict{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:600px){.verdict{grid-template-columns:minmax(0,1fr)}}
+.vbox{border-radius:var(--r);padding:14px;background:var(--sunk);display:flex;flex-direction:column;gap:6px}
+.vbox.after{background:var(--accent-soft)}
+.vbox .t{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.vbox .big{font:800 30px/1 var(--f-display);font-variant-numeric:tabular-nums}
+.vbox .det{font-size:12.5px;color:var(--muted);display:flex;flex-wrap:wrap;gap:4px 12px}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar select{width:auto}
+.rules{font-size:13px;color:var(--muted);display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px 22px;margin:0;padding:0;list-style:none}
+.rules li{padding-left:12px;border-left:2px solid var(--line)}
+.rules b{color:var(--fg)}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom,0px) + 20px);transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:13px}
+.empty{padding:22px;text-align:center;color:var(--muted);font-size:13.5px}
+.spin{font-size:13px;color:var(--muted)}
+@media (prefers-reduced-motion:no-preference){.kpi,.panel,section.card{transition:border-color .15s}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <span class="eyebrow">Remuneração variável · Canais indiretos</span>
+      <h1>Validador de Comissão</h1>
+      <p>Cruza o extrato do parceiro com o analítico do colaborador e lista as vendas que o parceiro recebeu e o colaborador não, pela data da venda.</p>
+    </div>
+    <div class="privacy"><span class="lock" aria-hidden="true"></span><span><b>Os arquivos ficam no seu computador.</b> A leitura e o cruzamento acontecem no próprio navegador; nada é enviado.</span></div>
+  </header>
+
+  <div class="grid">
+    <aside>
+      <div class="panel">
+        <div class="step"><span class="n">1</span><h2>Canal e perfil</h2></div>
+        <div class="chips" id="chans" role="group" aria-label="Canal"></div>
+        <div id="chanOff" class="note" hidden>As regras deste canal ainda não foram cadastradas. Envie o manual de comissão do canal para ativar.</div>
+        <div id="perfilBox">
+          <label class="fl" for="perfil">Seu perfil</label>
+          <select id="perfil"></select>
+          <p class="note" id="perfilCargos" style="margin-top:6px"></p>
+        </div>
+        <div class="weights" id="weights"></div>
+      </div>
+
+      <div class="panel">
+        <div class="step"><span class="n">2</span><h2>Arquivos</h2></div>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Adicionar arquivos">
+          <b>Adicionar arquivos</b> ou arraste aqui<br><span class="note">Extrato do parceiro, analítico do colaborador (um ou vários meses) e planilha de meta · .xlsx ou .csv</span>
+        </div>
+        <input type="file" id="fileIn" multiple accept=".xlsx,.xls,.csv" hidden>
+        <div class="files" id="files"></div>
+        <div id="colabBox" hidden>
+          <label class="fl" for="colab">Colaborador</label>
+          <select id="colab"></select>
+        </div>
+        <div id="partnerBox" hidden>
+          <span class="fl">Parceiros da carteira (código)</span>
+          <div class="chips" id="partners"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="step"><span class="n">3</span><h2>Mês da venda</h2></div>
+        <select id="mes" aria-label="Mês da venda"></select>
+        <p class="note">Vale a <b>data da ativação/instalação</b>. O mês de referência só diz quando o parceiro recebeu: uma venda de maio paga em junho conta para a meta de maio.</p>
+      </div>
+    </aside>
+
+    <main id="main">
+      <div class="banner" id="sampleBanner"><span><b>Dados de exemplo.</b> Os números abaixo são fictícios e mostram como o resultado aparece. Adicione seus arquivos para validar de verdade.</span></div>
+
+      <div class="headline">
+        <h2 id="hTitle">Resultado</h2>
+        <span class="ctx" id="hCtx"></span>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <section class="card">
+        <header><h3>Por indicador</h3><span class="note">Vendas com <b>VALIDO_COMISSAO = T</b> no extrato do parceiro, no mês da venda</span></header>
+        <div class="tw"><table id="tInd"></table></div>
+        <p class="note" id="tvNote"></p>
+      </section>
+
+      <section class="card">
+        <header><h3>Impacto na meta e na RV</h3><span class="note" id="simSrc"></span></header>
+        <div class="toolbar">
+          <label class="check"><input type="checkbox" id="incConferir" checked> Somar itens “conferir”</label>
+          <label class="check"><input type="checkbox" id="incCombo"> Somar Claro Multi indicativo</label>
+          <label class="check" id="elBox"><input type="checkbox" id="elearning"> E-learning atingido (+10%)</label>
+          <span class="note" style="margin-left:auto">Realizado:
+            <select id="realSrc" aria-label="Origem do realizado"><option value="meta">planilha de meta</option><option value="analitico">contado no analítico</option></select></span>
+        </div>
+        <div class="tw"><table id="tSim" class="sim"></table></div>
+        <div class="verdict" id="verdict"></div>
+        <p class="note">Etapa I: realizado ÷ meta × peso, cada indicador limitado a 150%. Abaixo de 80% no ponderado não há RV; o teto da Etapa I é 150%. Meta Estrela e E-learning só entram se houver elegibilidade.</p>
+      </section>
+
+      <section class="card">
+        <header><h3>Vendas pagas ao parceiro e não pagas ao colaborador</h3>
+          <div class="toolbar">
+            <select id="fInd" aria-label="Filtrar indicador"></select>
+            <select id="fAcao" aria-label="Filtrar ação"><option value="">Todas as ações</option><option value="CONTESTAR">Contestar</option><option value="CONFERIR">Conferir</option></select>
+            <button class="btn" id="copyBtn">Copiar para Excel</button>
+            <button class="btn primary" id="xlsBtn">Baixar Excel</button>
+          </div>
+        </header>
+        <ul class="rules">
+          <li><span class="pill contestar">Contestar</span> O parceiro recebeu e o analítico do mês em que ele recebeu foi enviado, mas a venda não está paga ao colaborador. Prazo: 15 dias corridos após o envio do resultado.</li>
+          <li><span class="pill conferir">Conferir</span> O parceiro recebeu numa referência cujo analítico não foi enviado. Envie o analítico dessa referência para confirmar.</li>
+        </ul>
+        <div class="tw"><table id="tGap"></table></div>
+      </section>
+
+      <section class="card" id="comboCard">
+        <header><h3>Claro Multi · indicativo</h3><span class="note">Contratos com linha móvel “- CM” paga ao parceiro sem Combo Multi pago no analítico</span></header>
+        <div class="tw"><table id="tCombo"></table></div>
+        <p class="note">O extrato do parceiro não traz a marcação de Combo como o analítico. Use esta lista para conferência manual antes de contestar.</p>
+      </section>
+
+      <section class="card">
+        <header><h3>Regras aplicadas</h3><span class="note" id="normaRef"></span></header>
+        <ul class="rules">
+          <li><b>Conta</b>: ativação pós-pago e migração pré→pós de plano Conta, titular e dependente.</li>
+          <li><b>Controle</b>: ativação e migração pré→Controle, Controle Fácil e Claro Flex cartão.</li>
+          <li><b>TV</b>: vendas instaladas. Claro TV pré conta 1 gross a cada 2 vendas (peso 0,5); a partir da 2ª recarga não conta.</li>
+          <li><b>Banda Larga Fixa</b> e <b>Banda Larga Móvel</b>: vendas instaladas/ativadas e remuneradas.</li>
+          <li><b>Fora da conta</b>: estornos (não reduzem a RV do colaborador), dependente gratuito e qualquer gratuidade/degustação, mesmo que o parceiro depois receba a linha como dependente pago, transferência de titularidade, upgrade/downgrade, migração Controle→Conta, serviços e bônus.</li>
+          <li><b>Cruzamento</b>: linha móvel pelo NTC; TV e BLF pelo contrato (9 dígitos finais). A mesma venda pode aparecer até 45 dias depois com nova data quando a pendência é regularizada; vale a data original.</li>
+        </ul>
+      </section>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+/* Motor de validação de comissão — roda no navegador (global VC) e no Node (module.exports). */
+(function (root) {
+  'use strict';
+
+  var IND = {
+    CONTA: 'Conta', CONTROLE: 'Controle', TV: 'TV', BLF: 'Banda Larga Fixa',
+    BLM: 'Banda Larga Móvel', COMBO: 'Claro Multi'
+  };
+  var IND_ORDER = ['CONTA', 'CONTROLE', 'TV', 'BLF', 'BLM', 'COMBO'];
+
+  var CHANNELS = {
+    AA: {
+      nome: 'Agente Autorizado', ativo: true,
+      norma: 'PL-DRH-042 · Anexo I-F rev. 09 · Grupo I rev. 05 · Grupo II rev. 08 (18/11/2025)',
+      perfis: {
+        G2P1: { nome: 'Grupo II · Perfil 1 · Área cabeada', cargos: 'Gerente de Negócios AA I/II/III, Gerente Filial, Gerente Vendas Indiretas, Coordenador Filial II, Gerente Regional, Key Account',
+          pesos: { BLM: 0, CONTA: .30, CONTROLE: .15, TV: .15, BLF: .25, COMBO: .15 },
+          estrela: { TV: [3.5, 7.5, 15], BLF: [5, 10, 20], COMBO: [5, 10, 20] }, elearning: true },
+        G2P2: { nome: 'Grupo II · Perfil 2 · Área não cabeada', cargos: 'Mesmos cargos do Grupo II, carteira só em área não cabeada',
+          pesos: { BLM: .05, CONTA: .30, CONTROLE: .25, TV: .25, BLF: 0, COMBO: .15 },
+          estrela: { TV: [3.5, 7.5, 15], BLM: [5.5, 11, 22.5], COMBO: [5.5, 11, 22.5] }, elearning: true },
+        G2P3: { nome: 'Grupo II · Perfil 3 · Brand Shop', cargos: 'Carteira só com lojas Brand Shop (sem Estrela e sem E-learning)',
+          pesos: { CONTA: 1 }, estrela: {}, elearning: false },
+        G1: { nome: 'Grupo I · Gerente Vendas AA', cargos: 'Gerente Vendas Agente Autorizados (nacional)',
+          pesos: { CONTA: .30, CONTROLE: .15, TV: .15, BLF: .25, COMBO: .15 },
+          estrela: { TV: [3.5, 7.5, 15], BLF: [5, 10, 20], COMBO: [5, 10, 20] }, elearning: true }
+      }
+    },
+    LP: { nome: 'LP', ativo: false, perfis: {} },
+    VAREJO: { nome: 'Varejo', ativo: false, perfis: {} },
+    RECARGA: { nome: 'Recarga', ativo: false, perfis: {} },
+    EMPRESAS: { nome: 'Claro Empresas', ativo: false, perfis: {} }
+  };
+
+  // Eventos de venda (gross) no extrato do parceiro — canal AA
+  var GROSS_OPS = ['ATIVACAO POS-PAGO', 'MIGRACAO PRE-POS', 'CONTROLE FACIL', 'CONTROLE FACIL MIG',
+    'TV', 'BANDA LARGA FIXA', 'CONTESTACAO ATIVACOES', 'CONTESTACAO TV'];
+  var EXCLUDE_ARQ = /TRANSF TITULARIDADE|PAGAR_[2-9]/;
+  var GRATIS = /GRATUITO|GRATIS|DEGUSTACAO|CORTESIA/;
+  var CLUSTER_DAYS = 45;
+
+  function norm(s) {
+    return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .toUpperCase().trim().replace(/\s+/g, '_');
+  }
+  function txt(s) { return String(s == null ? '' : s).normalize('NFD').replace(/[̀-ͯ]/g, '').toUpperCase().trim(); }
+
+  // data → número de dias (UTC). Aceita serial Excel, Date, 'YYYY-MM-DD', 'DD/MM/YYYY'
+  function toDay(v) {
+    if (v == null || v === '') return null;
+    if (typeof v === 'number') { if (v > 20000 && v < 80000) return Math.round(v) - 25569; return null; }
+    if (v instanceof Date && !isNaN(v)) return Math.floor((Date.UTC(v.getFullYear(), v.getMonth(), v.getDate())) / 864e5);
+    var s = String(v).trim(), m;
+    if ((m = s.match(/^(\d{4})-(\d{2})-(\d{2})/))) return Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5;
+    if ((m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/))) return Date.UTC(+m[3], +m[2] - 1, +m[1]) / 864e5;
+    if (/^\d+(\.\d+)?$/.test(s)) return toDay(+s);
+    return null;
+  }
+  function dayISO(d) { return d == null ? '' : new Date(d * 864e5).toISOString().slice(0, 10); }
+  function dayBR(d) { if (d == null) return ''; var s = dayISO(d); return s.slice(8, 10) + '/' + s.slice(5, 7) + '/' + s.slice(0, 4); }
+  function dayYM(d) { if (d == null) return ''; var s = dayISO(d); return s.slice(0, 4) + s.slice(5, 7); }
+  function ymBR(ym) { ym = String(ym); return ym.slice(4, 6) + '/' + ym.slice(0, 4); }
+  function digits(v) {
+    if (v == null) return '';
+    if (typeof v === 'number') return isFinite(v) ? Math.round(v).toString() : '';
+    return String(v).replace(/\.0+$/, '').replace(/\D/g, '');
+  }
+  function ctr9(v) { var d = digits(v).replace(/^0+/, ''); if (!d) return ''; return String(+d.slice(-9)); }
+  function num(v) { var n = typeof v === 'number' ? v : parseFloat(String(v || '').replace(',', '.')); return isFinite(n) ? n : 0; }
+  function isTrue(v) { var t = txt(v); return t === 'T' || t === 'TRUE' || t === 'S' || t === 'SIM' || t === '1' || t === 'VERDADEIRO'; }
+
+  // rows: array de objetos com cabeçalho original → normaliza chaves
+  function normRows(rows) {
+    return rows.map(function (r) { var o = {}; for (var k in r) o[norm(k)] = r[k]; return o; });
+  }
+
+  function detectKind(rows) {
+    if (!rows.length) return null;
+    var k = Object.keys(normRows(rows.slice(0, 1))[0]);
+    if (k.indexOf('VALIDO_COMISSAO') >= 0 && k.indexOf('TIPO_OPERACAO') >= 0) return 'parceiro';
+    if (k.indexOf('FG_CONSIDERA_PG') >= 0 || k.indexOf('NM_TIPO_VENDA') >= 0) return 'analitico';
+    if (k.indexOf('INDICADOR') >= 0 && k.indexOf('META') >= 0) return 'meta';
+    return null;
+  }
+
+  function classify(r) {
+    var tipo = txt(r.TIPO_OPERACAO), plano = txt(r.PLANO), arq = txt(r.ARQUIVO);
+    if (GROSS_OPS.indexOf(tipo) < 0) return null;
+    if (EXCLUDE_ARQ.test(arq)) return null;
+    if (tipo === 'TV' || tipo === 'CONTESTACAO TV') return 'TV';
+    if (tipo === 'BANDA LARGA FIXA') return 'BLF';
+    if (tipo.indexOf('CONTROLE') >= 0) return 'CONTROLE';
+    if (plano.indexOf('INTERNET') >= 0) return 'BLM';
+    if (plano.indexOf('CONTROLE') >= 0 || plano.indexOf('FLEX') >= 0 || arq === 'CLARO FLEX') return 'CONTROLE';
+    return 'CONTA';
+  }
+
+  function parsePartner(rawRows) {
+    var rows = normRows(rawRows), out = [], skipped = 0;
+    rows.forEach(function (r) {
+      var ind = classify(r); if (!ind) return;
+      var ntc = digits(r.NUN_NTC); if (ntc === '0') ntc = '';
+      var rawC = digits(r.CONTRATO_EBT_NET), c = ctr9(r.CONTRATO_EBT_NET); if (c === '0') c = '';
+      var dt = toDay(r.DATA_ATIVACAO);
+      var key = (ind === 'TV' || ind === 'BLF') ? (c ? 'C' + c : '') : (ntc ? 'N' + ntc : '');
+      if (!key || dt == null) { skipped++; return; }
+      var arq = txt(r.ARQUIVO);
+      out.push({ key: key, ind: ind, dt: dt, ntc: ntc, ctr: c, cod: txt(r.COD_MOBILE), mes: String(digits(r.MES_REFERENCIA)),
+        valid: isTrue(r.VALIDO_COMISSAO), valor: num(r.VALOR_COMISSAO), arq: arq, tipo: txt(r.TIPO_OPERACAO),
+        plano: String(r.PLANO || ''), dsc: String(r.DSC_NOME_PLANO || ''), pend: txt(r.PENDENCIA),
+        tvPre: ind === 'TV' && (/^PAGAR_/.test(arq) || (rawC.length === 11 && rawC.slice(0, 2) === '21')),
+        cm: / - CM$/.test(arq), gratis: GRATIS.test(arq) || GRATIS.test(txt(r.PENDENCIA)) || GRATIS.test(txt(r.PLANO)) });
+    });
+    return { rows: out, skipped: skipped };
+  }
+
+  // agrupa linhas do parceiro em vendas (mesma chave+indicador, datas até 45 dias da 1ª)
+  function buildEvents(prows) {
+    var by = {};
+    prows.forEach(function (r) { (by[r.key + '|' + r.ind] = by[r.key + '|' + r.ind] || []).push(r); });
+    var evs = [];
+    Object.keys(by).forEach(function (k) {
+      var list = by[k].sort(function (a, b) { return a.dt - b.dt; }), cur = null;
+      list.forEach(function (r) {
+        if (!cur || r.dt - cur.dt > CLUSTER_DAYS) { cur = { rows: [] , dt: r.dt }; evs.push(cur); }
+        cur.rows.push(r);
+      });
+    });
+    return evs.map(function (e) {
+      var f = e.rows[0], T = e.rows.filter(function (r) { return r.valid; });
+      var meses = {}; e.rows.forEach(function (r) { meses[r.mes] = 1; });
+      var mesesT = {}; T.forEach(function (r) { mesesT[r.mes] = 1; });
+      var pendRow = e.rows.filter(function (r) { return r.pend && r.pend !== 'OK'; })[0];
+      var tvPre = e.rows.some(function (r) { return r.tvPre; });
+      return { key: f.key, ind: f.ind, dt: e.dt, ym: dayYM(e.dt), ntc: f.ntc, ctr: f.ctr || (e.rows.filter(function (r) { return r.ctr; })[0] || {}).ctr || '',
+        cod: f.cod, valid: T.length > 0, mesesT: Object.keys(mesesT).sort(), meses: Object.keys(meses).sort(),
+        valor: T.reduce(function (s, r) { return s + r.valor; }, 0), arq: (T[0] || f).arq, tipo: (T[0] || f).tipo,
+        plano: (T[0] || f).plano, dsc: (T[0] || f).dsc, pendOrig: pendRow ? pendRow.pend : '',
+        tvPre: tvPre, peso: tvPre ? 0.5 : 1, cm: e.rows.some(function (r) { return r.cm; }),
+        gratis: e.rows.some(function (r) { return r.gratis; }) };
+    });
+  }
+
+  var AN_MAP = { 'CONTA': 'CONTA', 'CONTROLE': 'CONTROLE', 'TV': 'TV', 'BANDA LARGA FIXA': 'BLF',
+    'BANDA LARGA': 'BLM', 'BANDA LARGA MOVEL': 'BLM', 'COMBO MULTI': 'COMBO', 'CLARO MULTI': 'COMBO' };
+
+  function parseAnalytic(rawRows) {
+    var rows = normRows(rawRows), out = [];
+    rows.forEach(function (r) {
+      var ind = AN_MAP[txt(r.NM_TIPO_VENDA)] || AN_MAP[txt(r.NM_INDICADOR)];
+      if (!ind) return;
+      var ntc = digits(r.NR_NTC); if (ntc === '0') ntc = '';
+      var c = ctr9(r.NR_CONTRATO); if (c === '0') c = '';
+      var key = (ind === 'TV' || ind === 'BLF' || ind === 'COMBO') ? (c ? 'C' + c : (ntc ? 'N' + ntc : '')) : (ntc ? 'N' + ntc : (c ? 'C' + c : ''));
+      var pg = txt(r.FG_CONSIDERA_PG);
+      out.push({ key: key, ind: ind, dt: toDay(r.DT_EVENTO), mesRef: String(digits(r.NR_MES_REFERENCIA)), ntc: ntc, ctr: c,
+        pago: pg ? (pg === 'SIM' || pg === 'S') : num(r.VL_PESO) > 0, peso: r.VL_PESO == null ? 1 : num(r.VL_PESO),
+        motivo: String(r.DS_MOTIVO_NAO_PG || ''), colab: String(r.NM_COLABORADOR || '').trim(),
+        matricula: String(digits(r.CD_MATRICULA)), funcao: String(r.NM_FUNCAO || ''), revenda: txt(r.CD_REVENDA),
+        parceiro: String(r.NM_RAZAO_SOCIAL_PARCEIRO || '') });
+    });
+    return out;
+  }
+
+  var META_MAP = { 'CONTA': 'CONTA', 'CONTROLE': 'CONTROLE', 'TV': 'TV', 'BANDA LARGA FIXA': 'BLF',
+    'BANDA LARGA MOVEL': 'BLM', 'CLARO MULTI': 'COMBO', 'COMBO MULTI': 'COMBO', 'MULTI': 'COMBO' };
+  function parseMeta(rawRows) {
+    var rows = normRows(rawRows), out = {}, colab = '';
+    rows.forEach(function (r) {
+      if (r.COLABORADOR && !colab) colab = String(r.COLABORADOR);
+      var ind = META_MAP[txt(r.INDICADOR)]; if (!ind) return;
+      out[ind] = { meta: num(r.META), peso: r.PESO == null || r.PESO === '' ? null : num(r.PESO),
+        realizado: r.REALIZADO == null || r.REALIZADO === '' ? null : num(r.REALIZADO) };
+    });
+    return { ind: out, colab: colab };
+  }
+
+  // Cruzamento para o mês da venda (ym = 'AAAAMM')
+  function validate(events, analytic, ym, opts) {
+    opts = opts || {};
+    var idx = {}, idxKey = {}, refs = {};
+    analytic.forEach(function (a) {
+      refs[a.mesRef] = 1;
+      (idx[a.key + '|' + a.ind] = idx[a.key + '|' + a.ind] || []).push(a);
+      (idxKey[a.key] = idxKey[a.key] || []).push(a);
+    });
+    var partners = opts.partners; // filtro opcional de COD_MOBILE
+    var monthAll = events.filter(function (e) { return e.ym === ym && e.valid && (!partners || partners[e.cod]); });
+    // Gratuidade/degustação não é elegível à RV (Anexo I-F, 2.1.3 xi) — inclui dependente gratuito
+    var excluidos = monthAll.filter(function (e) { return e.gratis; }).map(function (e) { return Object.assign({}, e, { motivoExc: 'Dependente/produto gratuito: fora da regra (2.1.3 xi)' }); });
+    var month = monthAll.filter(function (e) { return !e.gratis; });
+    var items = month.map(function (e) {
+      var cand = (idx[e.key + '|' + e.ind] || []).filter(function (a) { return a.dt == null || Math.abs(a.dt - e.dt) <= CLUSTER_DAYS; });
+      var paid = cand.filter(function (a) { return a.pago; });
+      var st, motivo = '', aDt = null, aRef = '';
+      if (paid.length) { st = 'PAGO'; aDt = paid[0].dt; aRef = paid[0].mesRef; }
+      else if (cand.length) { st = 'NAO_PAGO'; motivo = cand[0].motivo; aDt = cand[0].dt; aRef = cand[0].mesRef; }
+      else {
+        st = 'AUSENTE';
+        var other = (idxKey[e.key] || []).filter(function (a) { return a.ind !== e.ind; });
+        if (other.length) motivo = 'Consta no analítico só como ' + other.map(function (a) { return IND[a.ind]; }).filter(function (v, i, s) { return s.indexOf(v) === i; }).join(', ');
+      }
+      var acao = 'OK';
+      if (st !== 'PAGO') {
+        var faltam = e.mesesT.filter(function (m) { return !refs[m]; });
+        acao = faltam.length ? 'CONFERIR' : 'CONTESTAR';
+        e.faltam = faltam;
+      }
+      return Object.assign({}, e, { st: st, motivo: motivo, aDt: aDt, aRef: aRef, acao: acao, faltam: e.faltam || [] });
+    });
+
+    // Claro Multi (indicativo): contratos com linha móvel "- CM" paga ao parceiro sem Combo pago no analítico
+    var comboPaid = {};
+    analytic.forEach(function (a) { if (a.ind === 'COMBO' && a.pago) comboPaid[a.ctr] = 1; });
+    var comboGap = {};
+    month.forEach(function (e) {
+      if (e.cm && e.ctr && !comboPaid[e.ctr]) { (comboGap[e.ctr] = comboGap[e.ctr] || []).push(e); }
+    });
+    var combos = Object.keys(comboGap).map(function (c) {
+      var l = comboGap[c]; return { ctr: c, linhas: l.length, cod: l[0].cod, dt: l[0].dt, ntcs: l.map(function (x) { return x.ntc; }) };
+    });
+
+    var resumo = {};
+    IND_ORDER.forEach(function (k) { resumo[k] = { parceiro: 0, pago: 0, contestar: 0, conferir: 0, colab: 0, qParceiro: 0, qPago: 0, qContestar: 0, qConferir: 0 }; });
+    items.forEach(function (i) {
+      var r = resumo[i.ind]; r.parceiro += i.peso; r.qParceiro++;
+      if (i.acao === 'OK') { r.pago += i.peso; r.qPago++; } else if (i.acao === 'CONTESTAR') { r.contestar += i.peso; r.qContestar++; } else { r.conferir += i.peso; r.qConferir++; }
+    });
+    resumo.COMBO.conferir = resumo.COMBO.qConferir = combos.reduce(function (s, c) { return s + c.linhas; }, 0);
+    analytic.forEach(function (a) { if (a.pago && dayYM(a.dt) === ym && resumo[a.ind]) resumo[a.ind].colab += a.peso; });
+
+    return { items: items, combos: combos, resumo: resumo, refs: Object.keys(refs).sort(), excluidos: excluidos };
+  }
+
+  function band(att, faixas) {
+    if (!faixas) return 0;
+    if (att >= 1.2) return faixas[2]; if (att >= 1) return faixas[1]; if (att >= 0.8) return faixas[0]; return 0;
+  }
+
+  // Simulação da RV (Etapa I, Estrela, E-learning)
+  function simulate(perfil, linhas, elearning) {
+    var total = 0, estrela = 0, rows = [];
+    IND_ORDER.forEach(function (k) {
+      var l = linhas[k]; if (!l) return;
+      var peso = l.peso != null ? l.peso : (perfil.pesos[k] || 0);
+      var att = l.meta > 0 ? l.real / l.meta : 0;
+      var pond = Math.min(att, 1.5) * peso;
+      total += pond;
+      rows.push({ ind: k, meta: l.meta, real: l.real, peso: peso, att: att, pond: pond, estrelaPct: 0 });
+    });
+    var elegivel = total >= 0.8 - 1e-9;
+    rows.forEach(function (r) {
+      var f = perfil.estrela[r.ind];
+      if (f && elegivel && r.meta > 0) { r.estrelaPct = band(r.att, f) / 100; estrela += r.estrelaPct; }
+    });
+    var etapa1 = Math.min(total, 1.5);
+    var el = elegivel && perfil.elearning && elearning ? 0.10 : 0;
+    return { rows: rows, ponderado: total, elegivel: elegivel, etapa1: elegivel ? etapa1 : 0, estrela: estrela, elearning: el,
+      rv: elegivel ? etapa1 + estrela + el : 0 };
+  }
+
+  var VC = { IND: IND, IND_ORDER: IND_ORDER, CHANNELS: CHANNELS, detectKind: detectKind, parsePartner: parsePartner,
+    buildEvents: buildEvents, parseAnalytic: parseAnalytic, parseMeta: parseMeta, validate: validate, simulate: simulate,
+    dayBR: dayBR, dayYM: dayYM, ymBR: ymBR, toDay: toDay };
+  if (typeof module !== 'undefined' && module.exports) module.exports = VC; else root.VC = VC;
+})(this);
+
+</script>
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id)};
+var IND=VC.IND, ORD=VC.IND_ORDER;
+var state={chan:'AA',perfil:'G2P1',files:[],sample:true,colab:'',partners:null,mes:'',edits:{}};
+try{var sv=JSON.parse(localStorage.getItem('vc-prefs')||'{}');if(sv.perfil)state.perfil=sv.perfil;if(sv.chan&&VC.CHANNELS[sv.chan])state.chan=sv.chan;}catch(e){}
+function savePrefs(){try{localStorage.setItem('vc-prefs',JSON.stringify({perfil:state.perfil,chan:state.chan}))}catch(e){}}
+function fmt(n,d){if(n==null||isNaN(n))return '–';return n.toLocaleString('pt-BR',{minimumFractionDigits:d||0,maximumFractionDigits:d==null?1:d})}
+function pct(n){return n==null||isNaN(n)?'–':(n*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'}
+function money(n){return 'R$ '+n.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function toast(m){var t=$('toast');t.textContent=m;t.hidden=false;clearTimeout(toast.t);toast.t=setTimeout(function(){t.hidden=true},2600)}
+
+/* ---------- exemplo fictício ---------- */
+function sampleData(){
+  var rnd=(function(s){return function(){s=(s*16807)%2147483647;return (s-1)/2147483646}})(42);
+  var P=[],A=[],cods=['AB12','CD34','EF56'];
+  function d(day){return '2026-05-'+String(day).padStart(2,'0')}
+  var n=0;
+  function ntc(){return 71900000000+Math.floor(rnd()*99999999)}
+  function add(ind,count,paidColab,extra){
+    for(var i=0;i<count;i++){
+      var day=1+Math.floor(rnd()*30),cod=cods[i%3],x=ntc(),c=170500000+(n++);
+      var tipo=ind==='TV'?'TV':ind==='BLF'?'BANDA LARGA FIXA':(rnd()<.35?'MIGRACAO PRE-POS':'ATIVACAO POS-PAGO');
+      var plano=ind==='CONTROLE'?'PLANO CONTROLE ON 20GB':ind==='CONTA'?'PLANO CLARO POS 50GB - CF':ind==='TV'?'CLARO TV MAIS BOX':'VIRTUA 500 MB';
+      var res=ind==='TV'||ind==='BLF';
+      var late=i<extra; // regularizada: paga ao parceiro no mês seguinte
+      var base={'DATA_ATIVACAO':d(day),'NUN_NTC':res?0:x,'TIPO_OPERACAO':tipo,'PLANO':plano,'COD_MOBILE':cod,'ARQUIVO':ind==='CONTROLE'?'CONTROLE':ind==='CONTA'?'POS PAGO':ind,'VALOR_FRANQUIA':0,'CONTRATO_EBT_NET':res?'230'+c:'', 'DSC_NOME_PLANO':plano};
+      if(late){
+        P.push(Object.assign({},base,{'MES_REFERENCIA':202605,'VALIDO_COMISSAO':'f','VALOR_COMISSAO':0,'PENDENCIA':i%2?'PORTABILIDADE PENDENTE':'CONTRATO NAO DIGITALIZADO NO GED'}));
+        P.push(Object.assign({},base,{'DATA_ATIVACAO':'2026-06-15','MES_REFERENCIA':202606,'VALIDO_COMISSAO':'t','VALOR_COMISSAO':180,'PENDENCIA':'OK'}));
+        A.push({'NR_MES_REFERENCIA':202605,'NM_COLABORADOR':'COLABORADOR EXEMPLO','CD_REVENDA':cod,'DT_EVENTO':d(day),'NM_TIPO_VENDA':ind==='BLF'?'BANDA LARGA FIXA':ind,'NR_NTC':res?0:x,'NR_CONTRATO':res?c:0,'FG_CONSIDERA_PG':'NÃO','DS_MOTIVO_NAO_PG':i%2?'PORTABILIDADE PENDENTE':'CONTRATO NAO DIGITALIZADO NO GED','VL_PESO':0});
+      }else{
+        P.push(Object.assign({},base,{'MES_REFERENCIA':202605,'VALIDO_COMISSAO':'t','VALOR_COMISSAO':150,'PENDENCIA':'OK'}));
+        var pago=i<paidColab+extra;
+        if(pago)A.push({'NR_MES_REFERENCIA':202605,'NM_COLABORADOR':'COLABORADOR EXEMPLO','CD_REVENDA':cod,'DT_EVENTO':d(day),'NM_TIPO_VENDA':ind==='BLF'?'BANDA LARGA FIXA':ind,'NR_NTC':res?0:x,'NR_CONTRATO':res?c:0,'FG_CONSIDERA_PG':'SIM','DS_MOTIVO_NAO_PG':'OK','VL_PESO':1});
+      }
+    }
+  }
+  add('CONTA',58,52,4);add('CONTROLE',120,118,3);add('TV',22,21,0);add('BLF',30,28,0);
+  var M=[{INDICADOR:'Conta',META:70,PESO:.3,REALIZADO:52},{INDICADOR:'Controle',META:110,PESO:.15,REALIZADO:118},{INDICADOR:'TV',META:20,PESO:.15,REALIZADO:21},{INDICADOR:'Banda Larga Fixa',META:40,PESO:.25,REALIZADO:28},{INDICADOR:'Claro Multi',META:30,PESO:.15,REALIZADO:14}];
+  return [{name:'exemplo_extrato_parceiro.xlsx',kind:'parceiro',rows:P},{name:'exemplo_analitico_mai.xlsx',kind:'analitico',rows:A},{name:'exemplo_meta.xlsx',kind:'meta',rows:M}];
+}
+
+/* ---------- canal e perfil ---------- */
+function renderChannels(){
+  var h='';Object.keys(VC.CHANNELS).forEach(function(k){var c=VC.CHANNELS[k];
+    h+='<button class="chan'+(c.ativo?'':' off')+'" aria-pressed="'+(k===state.chan)+'" data-ch="'+k+'">'+esc(k==='EMPRESAS'?'Claro Empresas':k==='VAREJO'?'Varejo':k==='RECARGA'?'Recarga':k)+'</button>'});
+  $('chans').innerHTML=h;
+  var ch=VC.CHANNELS[state.chan];
+  $('chanOff').hidden=ch.ativo;$('perfilBox').hidden=!ch.ativo;$('weights').hidden=!ch.ativo;
+  if(ch.ativo){
+    if(!ch.perfis[state.perfil])state.perfil=Object.keys(ch.perfis)[0];
+    $('perfil').innerHTML=Object.keys(ch.perfis).map(function(k){return '<option value="'+k+'"'+(k===state.perfil?' selected':'')+'>'+esc(ch.perfis[k].nome)+'</option>'}).join('');
+    var p=ch.perfis[state.perfil];$('perfilCargos').textContent=p.cargos;
+    $('weights').innerHTML=ORD.filter(function(k){return p.pesos[k]!=null}).map(function(k){return '<div><b>'+fmt(p.pesos[k]*100,0)+'%</b>'+IND[k]+'</div>'}).join('');
+    $('normaRef').textContent=ch.norma||'';
+    $('elBox').hidden=!p.elearning;
+  }
+}
+$('chans').addEventListener('click',function(e){var b=e.target.closest('[data-ch]');if(!b)return;state.chan=b.dataset.ch;savePrefs();renderChannels();run()});
+$('perfil').addEventListener('change',function(){state.perfil=this.value;savePrefs();renderChannels();run()});
+
+/* ---------- arquivos ---------- */
+function readFile(f){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){try{var wb=XLSX.read(new Uint8Array(r.result),{type:'array'});
+  var best=null;wb.SheetNames.forEach(function(n){var rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{defval:null,raw:true});var k=VC.detectKind(rows);if(k&&(!best||rows.length>best.rows.length))best={rows:rows,kind:k}});
+  res(best?{name:f.name,kind:best.kind,rows:best.rows}:{name:f.name,kind:null,rows:[]})}catch(e){rej(e)}};r.onerror=rej;r.readAsArrayBuffer(f)})}
+function addFiles(list){
+  if(!list||!list.length)return;
+  $('files').insertAdjacentHTML('afterbegin','<div class="spin" id="spin">Lendo '+list.length+' arquivo(s)…</div>');
+  Promise.all(Array.prototype.map.call(list,readFile)).then(function(arr){
+    if(state.sample){state.files=[];state.sample=false;state.partners=null;state.mes='';state.colab='';state.edits={}}
+    arr.forEach(function(f){if(!f.kind)toast(f.name+': formato não reconhecido. Confira se é o extrato do parceiro, o analítico ou a planilha de meta.');else state.files.push(f)});
+    rebuild();
+  }).catch(function(){toast('Não consegui ler um dos arquivos. Salve como .xlsx e tente de novo.');rebuild()});
+}
+$('drop').addEventListener('click',function(){$('fileIn').click()});
+$('drop').addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();$('fileIn').click()}});
+$('fileIn').addEventListener('change',function(){addFiles(this.files);this.value=''});
+['dragover','dragenter'].forEach(function(t){$('drop').addEventListener(t,function(e){e.preventDefault();this.classList.add('over')})});
+['dragleave','drop'].forEach(function(t){$('drop').addEventListener(t,function(e){e.preventDefault();this.classList.remove('over')})});
+$('drop').addEventListener('drop',function(e){addFiles(e.dataTransfer.files)});
+$('files').addEventListener('click',function(e){var b=e.target.closest('[data-rm]');if(!b)return;state.files.splice(+b.dataset.rm,1);if(!state.files.length){state.sample=true;state.files=sampleData()}rebuild()});
+
+var D={};
+function rebuild(){
+  var P=[],A=[],M=null;
+  state.files.forEach(function(f){if(f.kind==='parceiro')P=P.concat(f.rows);else if(f.kind==='analitico')A=A.concat(f.rows);else if(f.kind==='meta')M=f.rows});
+  D.pp=VC.parsePartner(P);D.events=VC.buildEvents(D.pp.rows);D.anAll=VC.parseAnalytic(A);D.meta=M?VC.parseMeta(M):null;
+  D.hasP=P.length>0;D.hasA=A.length>0;
+  var lbl={parceiro:'Parceiro',analitico:'Analítico',meta:'Meta'};
+  $('files').innerHTML=state.files.map(function(f,i){
+    var sub=f.rows.length.toLocaleString('pt-BR')+' linhas';
+    if(f.kind==='analitico'){var refs={};f.rows.forEach(function(r){var k=r.NR_MES_REFERENCIA;if(k)refs[k]=1});sub+=' · ref. '+Object.keys(refs).map(VC.ymBR).join(', ')}
+    return '<div class="file"><span class="tag '+f.kind+'">'+lbl[f.kind]+'</span><div style="min-width:0"><div class="nm" title="'+esc(f.name)+'">'+esc(f.name)+'</div><div class="sub">'+sub+'</div></div>'+(state.sample?'':'<button class="x" data-rm="'+i+'" aria-label="Remover '+esc(f.name)+'">×</button>')+'</div>'}).join('');
+  $('sampleBanner').hidden=!state.sample;
+  // colaboradores
+  var cs={};D.anAll.forEach(function(a){if(a.colab)cs[a.colab]=(cs[a.colab]||0)+1});
+  var cl=Object.keys(cs).sort();
+  $('colabBox').hidden=cl.length<2;
+  if(cl.indexOf(state.colab)<0)state.colab=cl[0]||'';
+  $('colab').innerHTML=cl.map(function(c){return '<option'+(c===state.colab?' selected':'')+'>'+esc(c)+'</option>'}).join('');
+  // parceiros
+  var ps={};D.events.forEach(function(e){if(e.valid)ps[e.cod]=(ps[e.cod]||0)+1});
+  var pl=Object.keys(ps).sort();
+  if(!state.partners){state.partners={};pl.forEach(function(p){state.partners[p]=true})}
+  $('partnerBox').hidden=pl.length<2;
+  $('partners').innerHTML=pl.map(function(p){return '<button class="chan" aria-pressed="'+(!!state.partners[p])+'" data-p="'+p+'">'+esc(p)+'</button>'}).join('');
+  // meses
+  var ms={};D.events.forEach(function(e){if(e.valid)ms[e.ym]=(ms[e.ym]||0)+1});
+  var ml=Object.keys(ms).sort();
+  if(ml.indexOf(state.mes)<0){var am={};D.anAll.forEach(function(a){var y=VC.dayYM(a.dt);if(ms[y])am[y]=(am[y]||0)+1});
+    var best=Object.keys(am).sort(function(a,b){return am[b]-am[a]})[0];state.mes=best||ml[ml.length-1]||''}
+  $('mes').innerHTML=ml.map(function(m){return '<option value="'+m+'"'+(m===state.mes?' selected':'')+'>'+VC.ymBR(m)+' · '+ms[m].toLocaleString('pt-BR')+' vendas T</option>'}).join('');
+  run();
+}
+$('colab').addEventListener('change',function(){state.colab=this.value;run()});
+$('partners').addEventListener('click',function(e){var b=e.target.closest('[data-p]');if(!b)return;state.partners[b.dataset.p]=!state.partners[b.dataset.p];b.setAttribute('aria-pressed',state.partners[b.dataset.p]);run()});
+$('mes').addEventListener('change',function(){state.mes=this.value;state.edits={};run()});
+['incConferir','incCombo','elearning','realSrc'].forEach(function(id){$(id).addEventListener('change',function(){if(id==='realSrc')state.edits={};run()})});
+$('fInd').addEventListener('change',renderGaps);$('fAcao').addEventListener('change',renderGaps);
+
+/* ---------- resultado ---------- */
+var R=null;
+function run(){
+  var ch=VC.CHANNELS[state.chan];
+  if(!ch.ativo||!D.events){$('main').style.opacity=.45;return}
+  $('main').style.opacity=1;
+  var an=state.colab?D.anAll.filter(function(a){return !a.colab||a.colab===state.colab}):D.anAll;
+  R=VC.validate(D.events,an,state.mes,{partners:state.partners});
+  R.an=an;
+  var gaps=R.items.filter(function(i){return i.acao!=='OK'});
+  var nC=gaps.filter(function(i){return i.acao==='CONTESTAR'}).length,nF=gaps.length-nC;
+  var tot=R.items.length,paid=R.items.filter(function(i){return i.acao==='OK'}).length;
+  var val=gaps.reduce(function(s,i){return s+i.valor},0);
+  $('hTitle').textContent='Vendas de '+VC.ymBR(state.mes);
+  $('hCtx').textContent=(state.colab||'')+(R.refs.length?' · analítico ref. '+R.refs.map(VC.ymBR).join(', '):' · sem analítico');
+  $('kpis').innerHTML=
+    kpi('Pagas ao parceiro',fmt(tot,0),'vendas com T no mês')+
+    kpi('Também pagas a você',fmt(paid,0),tot?pct(paid/tot)+' das vendas':'')+
+    kpi('Pagas só ao parceiro',fmt(gaps.length,0),nC+' contestar · '+nF+' conferir',true)+
+    kpi('Comissão do parceiro nessas vendas',money(val),'referência para priorizar');
+  // tabela por indicador
+  var h='<thead><tr><th>Indicador</th><th class="n">Pagas ao parceiro</th><th class="n">Pagas a você</th><th class="n">Contestar</th><th class="n">Conferir</th><th class="n">Diferença</th></tr></thead><tbody>';
+  var T={qParceiro:0,qPago:0,qContestar:0,qConferir:0};
+  ORD.forEach(function(k){var r=R.resumo[k];if(k==='COMBO')return;
+    if(!r.qParceiro&&!r.qConferir)return;
+    ['qParceiro','qPago','qContestar','qConferir'].forEach(function(f){T[f]+=r[f]});
+    var dif=r.qContestar+r.qConferir;
+    h+='<tr><td>'+IND[k]+'</td><td class="n">'+fmt(r.qParceiro,0)+'</td><td class="n">'+fmt(r.qPago,0)+'</td><td class="n">'+(r.qContestar?'<span class="gap">'+fmt(r.qContestar,0)+'</span>':'0')+'</td><td class="n">'+fmt(r.qConferir,0)+'</td><td class="n">'+(dif?'<span class="gap">+'+fmt(dif,0)+'</span>':'–')+'</td></tr>'});
+  h+='<tr class="tot"><td>Total</td><td class="n">'+fmt(T.qParceiro,0)+'</td><td class="n">'+fmt(T.qPago,0)+'</td><td class="n">'+fmt(T.qContestar,0)+'</td><td class="n">'+fmt(T.qConferir,0)+'</td><td class="n">+'+fmt(T.qContestar+T.qConferir,0)+'</td></tr>';
+  var rc=R.resumo.COMBO;
+  h+='<tr><td>Claro Multi <span class="muted">(indicativo, fora do total)</span></td><td class="n muted">–</td><td class="n muted">–</td><td class="n">0</td><td class="n">'+fmt(rc.conferir,0)+'</td><td class="n">'+(rc.conferir?'+'+fmt(rc.conferir,0):'–')+'</td></tr></tbody>';
+  $('tInd').innerHTML=h;
+  var tvp=R.items.filter(function(i){return i.tvPre}).length;
+  $('tvNote').textContent=tvp?'TV inclui '+tvp+' vendas de Claro TV pré. A tabela mostra vendas; na meta cada uma conta 0,5 (1 gross a cada 2 vendas).':'';
+  var ex=R.excluidos;if(ex.length)$('tvNote').textContent+=(tvp?' ':'')+ex.length+(ex.length>1?' vendas pagas ao parceiro foram excluídas':' venda paga ao parceiro foi excluída')+' por ser dependente/produto gratuito ('+ex.map(function(x){return x.ntc||x.ctr}).join(', ')+'), que a regra não contempla.';
+  // filtros
+  var fi=$('fInd').value;
+  $('fInd').innerHTML='<option value="">Todos os indicadores</option>'+ORD.filter(function(k){return k!=='COMBO'&&gaps.some(function(g){return g.ind===k})}).map(function(k){return '<option value="'+k+'"'+(k===fi?' selected':'')+'>'+IND[k]+'</option>'}).join('');
+  renderSim();renderGaps();renderCombo();
+}
+function kpi(l,v,s,hot){return '<div class="kpi'+(hot?' hot':'')+'"><span class="l">'+l+'</span><span class="v">'+v+'</span><span class="s">'+s+'</span></div>'}
+
+function renderSim(){
+  var p=VC.CHANNELS[state.chan].perfis[state.perfil];
+  var useMeta=$('realSrc').value==='meta'&&D.meta;
+  $('realSrc').disabled=!D.meta;if(!D.meta)$('realSrc').value='analitico';
+  $('simSrc').textContent=D.meta?'Meta e pesos da planilha de meta; edite os números se precisar.':'Sem planilha de meta: preencha a meta de cada indicador.';
+  var incF=$('incConferir').checked,incC=$('incCombo').checked;
+  var base={},after={},rowsH='';
+  var inds=ORD.filter(function(k){return p.pesos[k]!=null||(D.meta&&D.meta.ind[k])});
+  inds.forEach(function(k){
+    var m=D.meta&&D.meta.ind[k]||{};
+    var e=state.edits[k]||{};
+    var meta=e.meta!=null?e.meta:(m.meta||0);
+    var real=e.real!=null?e.real:(useMeta&&m.realizado!=null?m.realizado:R.resumo[k].colab);
+    var peso=p.pesos[k]!=null?p.pesos[k]:0;
+    var r=R.resumo[k];var add=r.contestar+(incF&&k!=='COMBO'?r.conferir:0)+(incC&&k==='COMBO'?r.conferir:0);
+    base[k]={meta:meta,real:real,peso:peso};after[k]={meta:meta,real:real+add,peso:peso};
+  });
+  var s0=VC.simulate(p,base,$('elearning').checked),s1=VC.simulate(p,after,$('elearning').checked);
+  var h='<thead><tr><th>Indicador</th><th class="n">Peso</th><th class="n">Meta</th><th class="n">Realizado</th><th class="n">+ Recuperável</th><th class="n">Ating. atual</th><th class="n">Ating. com ajuste</th><th style="min-width:110px">Até 150%</th><th class="n">Pontos</th></tr></thead><tbody>';
+  inds.forEach(function(k,i){var a=s0.rows[i],b=s1.rows[i];var add=b.real-a.real;
+    var w0=Math.min(a.att,1.5)/1.5*100,w1=Math.min(b.att,1.5)/1.5*100;
+    h+='<tr><td>'+IND[k]+'</td><td class="n mono">'+fmt(a.peso*100,0)+'%</td>'+
+      '<td class="n"><input type="number" min="0" step="1" id="m_'+k+'" data-k="'+k+'" data-f="meta" value="'+a.meta+'" aria-label="Meta '+IND[k]+'"></td>'+
+      '<td class="n"><input type="number" min="0" step="1" id="r_'+k+'" data-k="'+k+'" data-f="real" value="'+a.real+'" aria-label="Realizado '+IND[k]+'"></td>'+
+      '<td class="n">'+(add?'<span class="gap">+'+fmt(add)+'</span>':'–')+'</td><td class="n">'+pct(a.att)+'</td><td class="n">'+(add?'<b>'+pct(b.att)+'</b>':pct(b.att))+'</td>'+
+      '<td><div class="bar"><i class="after" style="width:'+w1+'%"></i><i style="width:'+w0+'%"></i></div></td>'+
+      '<td class="n mono">'+fmt(a.pond*100,1)+(b.pond>a.pond+1e-9?' → <span class="gap">'+fmt(b.pond*100,1)+'</span>':'')+'</td></tr>'});
+  h+='<tr class="tot"><td colspan="8">Resultado ponderado (Etapa I)</td><td class="n mono">'+pct(s0.ponderado)+(s1.ponderado>s0.ponderado+1e-9?' → <span class="gap">'+pct(s1.ponderado)+'</span>':'')+'</td></tr></tbody>';
+  $('tSim').innerHTML=h;
+  $('verdict').innerHTML=vbox('Hoje',s0,false)+vbox('Com as vendas recuperadas',s1,true);
+}
+function vbox(t,s,after){
+  var st=s.elegivel?'<span class="pill ok">Elegível</span>':'<span class="pill no">Abaixo de 80%: sem RV</span>';
+  return '<div class="vbox'+(after?' after':'')+'"><span class="t">'+t+'</span><span class="big">'+pct(s.rv)+'</span><span>'+st+'</span>'+
+    '<span class="det"><span>Ponderado '+pct(s.ponderado)+'</span><span>Etapa I '+pct(s.etapa1)+'</span><span>Estrela +'+pct(s.estrela)+'</span><span>E-learning +'+pct(s.elearning)+'</span></span></div>'}
+$('tSim').addEventListener('change',function(e){var t=e.target;if(!t.dataset.k)return;state.edits[t.dataset.k]=state.edits[t.dataset.k]||{};state.edits[t.dataset.k][t.dataset.f]=Math.max(0,+t.value||0);renderSim()});
+
+function gapRows(){
+  var fi=$('fInd').value,fa=$('fAcao').value;
+  return R.items.filter(function(i){return i.acao!=='OK'&&(!fi||i.ind===fi)&&(!fa||i.acao===fa)})
+    .sort(function(a,b){return (a.acao===b.acao?0:a.acao==='CONTESTAR'?-1:1)||ORD.indexOf(a.ind)-ORD.indexOf(b.ind)||a.dt-b.dt});
+}
+function situacao(i){
+  if(i.st==='NAO_PAGO')return 'No analítico ref. '+VC.ymBR(i.aRef)+' como não pago: '+(i.motivo||'sem motivo');
+  return i.motivo||'Não consta nos analíticos enviados';
+}
+function obs(i){
+  if(i.acao==='CONFERIR')return 'Envie o analítico ref. '+i.faltam.map(VC.ymBR).join(', ');
+  return 'Contestar em até 15 dias';
+}
+function renderGaps(){
+  var rows=gapRows();
+  if(!rows.length){$('tGap').innerHTML='<tbody><tr><td class="empty">Nenhuma venda paga só ao parceiro neste mês'+($('fInd').value||$('fAcao').value?' com esse filtro':'')+'.</td></tr></tbody>';return}
+  var h='<thead><tr><th>Ação</th><th>Indicador</th><th>Data da venda</th><th>NTC / contrato</th><th>Parceiro</th><th>Plano</th><th>Parceiro recebeu</th><th class="n">Valor parceiro</th><th>Situação no seu analítico</th><th>Próximo passo</th></tr></thead><tbody>';
+  rows.forEach(function(i){
+    h+='<tr><td><span class="pill '+i.acao.toLowerCase()+'">'+(i.acao==='CONTESTAR'?'Contestar':'Conferir')+'</span></td><td>'+IND[i.ind]+(i.tvPre?' <span class="muted">pré · 0,5</span>':'')+'</td>'+
+      '<td class="mono">'+VC.dayBR(i.dt)+'</td><td class="mono">'+esc(i.ntc||i.ctr)+'</td><td class="mono">'+esc(i.cod)+'</td><td class="wide">'+esc(i.dsc||i.plano)+'</td>'+
+      '<td class="mono">ref. '+i.mesesT.map(VC.ymBR).join(', ')+'</td><td class="n mono">'+money(i.valor)+'</td><td class="wide">'+esc(situacao(i))+(i.pendOrig&&i.pendOrig!==i.motivo?'<div class="muted" style="font-size:12px">Pendência no parceiro: '+esc(i.pendOrig)+'</div>':'')+'</td><td>'+esc(obs(i))+'</td></tr>'});
+  $('tGap').innerHTML=h+'</tbody>';
+}
+function renderCombo(){
+  var c=R.combos;
+  if(!c.length){$('tCombo').innerHTML='<tbody><tr><td class="empty">Nenhum contrato Claro Multi pendente neste mês.</td></tr></tbody>';return}
+  $('tCombo').innerHTML='<thead><tr><th>Contrato</th><th>Parceiro</th><th>Data</th><th class="n">Linhas CM</th><th>NTCs</th></tr></thead><tbody>'+
+    c.map(function(x){return '<tr><td class="mono">'+esc(x.ctr)+'</td><td class="mono">'+esc(x.cod)+'</td><td class="mono">'+VC.dayBR(x.dt)+'</td><td class="n">'+x.linhas+'</td><td class="mono">'+esc(x.ntcs.join(', '))+'</td></tr>'}).join('')+'</tbody>';
+}
+$('copyBtn').addEventListener('click',function(){
+  var rows=gapRows();
+  var head=['Ação','Indicador','Data da venda','NTC','Contrato','Parceiro','Plano','Parceiro recebeu (ref.)','Valor parceiro','Situação no analítico','Pendência no parceiro','Próximo passo'];
+  var lines=[head.join('\t')].concat(rows.map(function(i){return [i.acao==='CONTESTAR'?'Contestar':'Conferir',IND[i.ind]+(i.tvPre?' (pré)':''),VC.dayBR(i.dt),i.ntc,i.ctr,i.cod,i.dsc||i.plano,i.mesesT.map(VC.ymBR).join(', '),String(i.valor).replace('.',','),situacao(i),i.pendOrig,obs(i)].join('\t')}));
+  var text=lines.join('\n');
+  function fallback(){var ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast(rows.length+' linhas copiadas. Cole no Excel.')}catch(e){toast('Selecione e copie manualmente.')}ta.remove()}
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(function(){toast(rows.length+' linhas copiadas. Cole no Excel.')},fallback)}else fallback();
+});
+
+
+$('xlsBtn').addEventListener('click',function(){
+  if(!R)return;
+  var rows=gapRows().map(function(i){return {'Ação':i.acao==='CONTESTAR'?'Contestar':'Conferir','Indicador':IND[i.ind]+(i.tvPre?' (pré)':''),'Data da venda':VC.dayBR(i.dt),'NTC':i.ntc,'Contrato':i.ctr,'Parceiro':i.cod,'Plano':i.dsc||i.plano,'Parceiro recebeu (ref.)':i.mesesT.map(VC.ymBR).join(', '),'Valor parceiro':i.valor,'Situação no analítico':situacao(i),'Pendência no parceiro':i.pendOrig,'Peso na meta':i.peso,'Próximo passo':obs(i)}});
+  var wb=XLSX.utils.book_new();
+  var res=VC.IND_ORDER.filter(function(k){return k!=='COMBO'}).map(function(k){var r=R.resumo[k];return {'Indicador':IND[k],'Pagas ao parceiro':r.qParceiro,'Pagas ao colaborador':r.qPago,'Contestar':r.qContestar,'Conferir':r.qConferir,'Na meta (TV pré 0,5)':r.contestar+r.conferir}});
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(res),'Resumo');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows.length?rows:[{'Ação':'Nenhuma divergência'}]),'Divergências');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(R.combos.length?R.combos.map(function(c){return {'Contrato':c.ctr,'Parceiro':c.cod,'Data':VC.dayBR(c.dt),'Linhas CM':c.linhas,'NTCs':c.ntcs.join(', ')}}):[{'Contrato':'Nenhum'}]),'Claro Multi indicativo');
+  if(R.excluidos.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(R.excluidos.map(function(i){return {'NTC':i.ntc,'Data':VC.dayBR(i.dt),'Parceiro':i.cod,'Plano':i.plano,'Motivo':i.motivoExc}})),'Excluídos');
+  var nome=(state.colab||'colaborador').replace(/[^\w]+/g,'_');
+  XLSX.writeFile(wb,'Validacao_'+nome+'_'+state.mes+'.xlsx');
+});
+state.files=sampleData();
+renderChannels();rebuild();
+})();
+</script>
+
+</body>
+</html>
